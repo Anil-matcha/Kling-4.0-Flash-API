@@ -19,6 +19,8 @@ class KlingAPI:
         "pro_i2v": "kling-v3.0-pro-image-to-video",
         "standard_t2v": "kling-v3.0-standard-text-to-video",
         "standard_i2v": "kling-v3.0-standard-image-to-video",
+        "reference": "kling-4.0-reference-to-video",
+        "keyframe": "kling-4.0-keyframe-to-video",
     }
 
     def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None,
@@ -52,6 +54,29 @@ class KlingAPI:
         if not route:
             raise ValueError("tier must be 'standard' or 'pro'")
         return self._submit(route, {"prompt": prompt, "image_url": image_url, **parameters})
+
+    def reference_to_video(self, prompt: str, *, image_urls: Optional[list] = None,
+                           video_urls: Optional[list] = None, elements: Optional[list] = None,
+                           voices: Optional[list] = None, **parameters: Any) -> Dict[str, Any]:
+        """Kling 4.0 reference-to-video. Mention materials in the prompt as @image_1,
+        @video_1 (array order) or @name (elements and voices)."""
+        payload: Dict[str, Any] = {"prompt": prompt, **parameters}
+        for key, value in (("image_urls", image_urls), ("video_urls", video_urls),
+                           ("elements", elements), ("voices", voices)):
+            if value:
+                payload[key] = value
+        return self._submit(self.ROUTES["reference"], payload)
+
+    def keyframe_to_video(self, prompt: str, first_frame_url: str, *,
+                          keyframe_urls: Optional[list] = None,
+                          last_frame_url: Optional[str] = None, **parameters: Any) -> Dict[str, Any]:
+        """Kling 4.0 keyframe-to-video. Mention frames as @first_frame, @keyframe_1, @last_frame."""
+        payload: Dict[str, Any] = {"prompt": prompt, "first_frame_url": first_frame_url, **parameters}
+        if keyframe_urls:
+            payload["keyframe_urls"] = keyframe_urls
+        if last_frame_url:
+            payload["last_frame_url"] = last_frame_url
+        return self._submit(self.ROUTES["keyframe"], payload)
 
     def get_result(self, request_id: str) -> Dict[str, Any]:
         response = self.session.get(

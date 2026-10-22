@@ -19,7 +19,7 @@
 
 Use a small Python client to submit text-to-video or image-to-video jobs through MuAPI's Kling 4 API, then poll for the result. This repository includes setup instructions, Python and cURL examples, and original prompt recipes for product shots, social clips, and cinematic scenes. It covers the **Kling 4 API** and tracks availability for the **Kling 4.0 API**, **Kling 4 Flash API**, and **Kling 4.0 Flash API** search intents. See the status below before integrating: Flash access in the Kling app does not by itself mean a public API endpoint is available.
 
-> **Availability:** Kling 4 API access is live on MuAPI today. MuAPI serves Kling 4 requests through its existing, production Kling video pipeline while Kuaishou completes its own staged Kling 4.0 rollout (see [Kling 4.0 announcement status](#kling-40-announcement-status) below), and will transparently move these same routes onto Kuaishou's native Kling 4.0 models as direct access opens up. Check the live [MuAPI Kling 4 page](https://muapi.ai/kling-4) and [API reference](https://muapi.ai/docs/api-reference) for current parameters and response formats.
+> **Availability:** Kling 4 API access is live on MuAPI today. MuAPI serves native Kling 4.0 reference-to-video and keyframe-to-video endpoints, and the other Kling 4 requests run through its existing, production Kling video pipeline while Kuaishou completes its own staged Kling 4.0 rollout (see [Kling 4.0 announcement status](#kling-40-announcement-status) below), and will transparently move these same routes onto Kuaishou's native Kling 4.0 models as direct access opens up. Check the live [MuAPI Kling 4 page](https://muapi.ai/kling-4) and [API reference](https://muapi.ai/docs/api-reference) for current parameters and response formats.
 
 ## Contents
 
@@ -29,6 +29,8 @@ Use a small Python client to submit text-to-video or image-to-video jobs through
 - [Quick start](#quick-start)
 - [Text-to-video](#text-to-video)
 - [Image-to-video](#image-to-video)
+- [Kling 4.0 reference-to-video](#kling-40-reference-to-video)
+- [Kling 4.0 keyframe-to-video](#kling-40-keyframe-to-video)
 - [Prompt recipes](#prompt-recipes)
 - [cURL workflow](#curl-workflow)
 - [Supported routes](#supported-routes)
@@ -61,6 +63,7 @@ The terms **Kling 4 API** and **Kling 4.0 API** are often used for the broader K
 
 - A lightweight `KlingAPI` Python client for submitting jobs and polling results.
 - Text-to-video and image-to-video examples in Python.
+- Kling 4.0 reference-to-video (images, videos, elements, voices) and keyframe-to-video examples.
 - A cURL example for submitting a generation request.
 - A separate [prompt recipe guide](docs/prompt-recipes.md) with structured examples and iteration tips.
 - Direct calls to the MuAPI API, with the API key sent in the `x-api-key` header.
@@ -136,6 +139,34 @@ print(result)
 
 The image URL must be publicly accessible to the generation service. Private localhost URLs and files behind a login will not be fetchable by the provider.
 
+## Kling 4.0 reference-to-video
+
+`POST /kling-4.0-reference-to-video` generates 3-30 second clips (720p or 1080p, native audio) from your own materials: up to 10 reference images, 5 reference videos (2-30 s each, 30 s combined), 7 named elements and 3 voices, 15 materials in total. Mention them in the prompt as `@image_1`, `@video_1` (array order) or `@name`; every mention must match a material in the same request.
+
+```python
+from kling_api import KlingAPI
+
+api = KlingAPI()
+job = api.reference_to_video(
+    "@Hero sits at the desk, picks up the doll from @image_1, and greets using @Narrator",
+    image_urls=["https://example.com/doll.png"],
+    elements=[{"name": "Hero", "image_urls": ["https://example.com/hero-front.jpg", "https://example.com/hero-side.jpg"]}],
+    voices=[{"name": "Narrator", "audio_url": "https://example.com/narrator.mp3"}],
+    duration=10, resolution="1080p",
+)
+print(api.wait_for_completion(job["request_id"]))
+```
+
+An element takes either 2-4 `image_urls` or one 3-8 s `video_url` (character video). Set `keep_original_sound` to keep a reference video's audio. See [examples/reference_to_video.py](examples/reference_to_video.py).
+
+## Kling 4.0 keyframe-to-video
+
+`POST /kling-4.0-keyframe-to-video` takes a `first_frame_url`, optional `keyframe_urls` (up to 8, in order) and an optional `last_frame_url`; mention them as `@first_frame`, `@keyframe_1`, `@last_frame`. The frame total is capped by `duration` (3 s: 4 frames, 5 s: 6, 8 s: 9, 9 s or longer: 10) and the output follows the first frame's aspect ratio. See [examples/keyframe_to_video.py](examples/keyframe_to_video.py).
+
+### Pricing
+
+$0.157/s at 720p and $0.235/s at 1080p. With reference videos or video elements: $0.094/s (720p) / $0.141/s (1080p), billed on reference plus output seconds (minimum 2x the output length). Confirm on [muapi.ai/kling-4](https://muapi.ai/kling-4).
+
 ## Prompt recipes
 
 A useful prompt is a compact directing note. Include the subject, setting, one primary action, a camera move, and the details that must stay consistent. For image-to-video, assign the input image a clear role and avoid requesting changes to details it should preserve.
@@ -196,6 +227,8 @@ curl "https://api.muapi.ai/api/v1/predictions/REQUEST_ID/result" \
 | Kling 4 Pro image-to-video | `POST /kling-v3.0-pro-image-to-video` |
 | Kling 4 Standard text-to-video | `POST /kling-v3.0-standard-text-to-video` |
 | Kling 4 Standard image-to-video | `POST /kling-v3.0-standard-image-to-video` |
+| Kling 4.0 reference-to-video | `POST /kling-4.0-reference-to-video` |
+| Kling 4.0 keyframe-to-video | `POST /kling-4.0-keyframe-to-video` |
 | Check a generation result | `GET /predictions/{request_id}/result` |
 
 Base URL: `https://api.muapi.ai/api/v1`. These are MuAPI's live Kling 4 routes today, served through MuAPI's existing Kling video pipeline (the route names still reference the underlying `v3.0` model versioning — see [Kling 4.0 announcement status](#kling-40-announcement-status)). The client route names and forwarded options are visible in [`kling_api.py`](kling_api.py). Routes and accepted fields may change as MuAPI moves onto Kuaishou's native Kling 4.0 models; consult the [MuAPI API reference](https://muapi.ai/docs/api-reference) before production use.
